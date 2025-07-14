@@ -5,26 +5,57 @@ from webdriver_manager.chrome import ChromeDriverManager
 import time
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, UnexpectedAlertPresentException
+
+BASE_URL = "https://www.oasismuseum.com/ticket"
+TARGET_DATE = "2025-07-19"
+THEME_ID = "6"
+FULL_URL = f"{BASE_URL}?date={TARGET_DATE}&id={THEME_ID}"
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-
-driver.get("https://www.oasismuseum.com/ticket?date=2025-07-17&id=6")
+driver.get(FULL_URL)
 wait = WebDriverWait(driver, 30)
 
 def safe_find_elements():
-    for attempt in range(3):
+    while True:
+        print("페이지 로딩 완료 대기 중...")
         try:
-            return wait.until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "button.btn-opened:not([disabled])"))
-            )
+            def check_page_loaded(driver):
+                try:
+                    alert = driver.switch_to.alert
+                    return True
+                except:
+                    pass
+                if len(driver.find_elements(By.CSS_SELECTOR, "button.btn-opened, button.btn-closed")) > 0:
+                    return True
+                return False
+            
+            wait.until(check_page_loaded)
+            
+            try:
+                alert = driver.switch_to.alert
+                alert_text = alert.text
+                print(f"알림창 발견: {alert_text}")
+                alert.accept()
+                print("예약 불가능한 날짜입니다. 1초 후 다시 접속...")
+                time.sleep(1)
+                driver.get(FULL_URL)
+                continue
+            except:
+                pass
         except TimeoutException:
-            if attempt < 2:
-                print(f"시도 {attempt + 1} 실패, 재시도 중...")
-                driver.refresh()
-                time.sleep(3)
-            else:
-                raise
+            print("30초 대기 후에도 페이지가 로드되지 않음. 새로고침...")
+            driver.refresh()
+            continue
+        
+        active_btns = driver.find_elements(By.CSS_SELECTOR, "button.btn-opened")
+        if active_btns:
+            print(f"예약 가능한 시간 {len(active_btns)}개 발견!")
+            return active_btns
+        
+        print("예약 가능한 시간이 없습니다. 1초 후 새로고침...")
+        time.sleep(1)
+        driver.refresh()
 
 available_time_buttons = safe_find_elements()
 
