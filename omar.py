@@ -14,11 +14,10 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoAlertPresentException
 from selenium.webdriver.support.ui import Select
 import tkinter.font as tkfont
+from tkcalendar import DateEntry
 
 BASE_URL = "https://www.oasismuseum.com/ticket"
-TARGET_DATE = "2025-07-18"
 THEME_ID = "6"
-FULL_URL = f"{BASE_URL}?date={TARGET_DATE}&id={THEME_ID}"
 priority_times = [
     "15:00",
     "13:20",
@@ -94,10 +93,12 @@ def safe_find_elements(driver, wait, FULL_URL):
         time.sleep(1)
         driver.refresh()
 
-def start_reservation(name, phone, log_callback=None):
+def start_reservation(name, phone, date):
     try:
         print(f"예약자 이름: {name}")
         print(f"전화번호: {phone}")
+        print(f"예약 날짜: {date}")
+        FULL_URL = f"{BASE_URL}?date={date}&id={THEME_ID}"
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
         driver.get(FULL_URL)
         wait = WebDriverWait(driver, 30)
@@ -186,6 +187,7 @@ def restore_placeholder(event, entry, hint):
 def on_start():
     name = entry_name.get()
     phone = entry_phone.get()
+    date = entry_date.get()
     if name == NAME_HINT:
         name = ""
     if phone == PHONE_HINT:
@@ -197,7 +199,7 @@ def on_start():
         messagebox.showwarning("입력 오류", "전화번호는 010으로 시작하고, 숫자만 입력하며, 10~11자리여야 합니다.")
         return
     btn_start.config(state=tk.DISABLED)
-    threading.Thread(target=lambda: [start_reservation(name, phone), btn_start.config(state=tk.NORMAL)], daemon=True).start()
+    threading.Thread(target=lambda: [start_reservation(name, phone, date), btn_start.config(state=tk.NORMAL)], daemon=True).start()
 
 def on_close():
     if messagebox.askokcancel("종료", "프로그램을 종료하시겠습니까?"):
@@ -213,19 +215,25 @@ frame = tk.Frame(root)
 frame.pack(pady=10)
 
 FONT = (tkfont.nametofont("TkDefaultFont").actual()["family"], 12)
+ENTRY_WIDTH = 12
+
 tk.Label(frame, text="이름:", font=FONT).grid(row=0, column=0, sticky="e")
-entry_name = tk.Entry(frame, font=FONT)
-entry_name.grid(row=0, column=1, padx=5)
+entry_name = tk.Entry(frame, font=FONT, width=ENTRY_WIDTH, justify="center")
+entry_name.grid(row=0, column=1, padx=5, sticky="w")
 set_placeholder(entry_name, NAME_HINT)
 entry_name.bind("<FocusIn>", lambda e: clear_placeholder(e, entry_name, NAME_HINT))
 entry_name.bind("<FocusOut>", lambda e: restore_placeholder(e, entry_name, NAME_HINT))
 
 tk.Label(frame, text="전화번호:", font=FONT).grid(row=1, column=0, sticky="e")
-entry_phone = tk.Entry(frame, font=FONT)
-entry_phone.grid(row=1, column=1, padx=5)
+entry_phone = tk.Entry(frame, font=FONT, width=ENTRY_WIDTH, justify="center")
+entry_phone.grid(row=1, column=1, padx=5, sticky="w")
 set_placeholder(entry_phone, PHONE_HINT)
 entry_phone.bind("<FocusIn>", lambda e: clear_placeholder(e, entry_phone, PHONE_HINT))
 entry_phone.bind("<FocusOut>", lambda e: restore_placeholder(e, entry_phone, PHONE_HINT))
+
+tk.Label(frame, text="날짜:", font=FONT).grid(row=2, column=0, sticky="e")
+entry_date = DateEntry(frame, font=FONT, date_pattern="yyyy-mm-dd", state="readonly", width=ENTRY_WIDTH, justify="center")
+entry_date.grid(row=2, column=1, padx=5, sticky="w")
 
 btn_start = tk.Button(root, text="예매 시작", command=on_start, font=FONT)
 btn_start.pack(pady=5)
