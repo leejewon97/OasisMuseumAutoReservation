@@ -5,7 +5,7 @@ a = Analysis(
     ['omar.py'],
     pathex=[],
     binaries=[],
-    datas=[('my_icon.ico', '.')],
+    datas=[('my_icon.ico', '.'), ('Lib/site-packages/selenium_stealth/js', 'selenium_stealth/js')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

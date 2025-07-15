@@ -15,6 +15,8 @@ from selenium.common.exceptions import TimeoutException, NoAlertPresentException
 from selenium.webdriver.support.ui import Select
 import tkinter.font as tkfont
 from tkcalendar import DateEntry
+import undetected_chromedriver as uc
+from selenium_stealth import stealth
 
 BASE_URL = "https://www.oasismuseum.com/ticket"
 THEME_ID = "6"
@@ -93,13 +95,24 @@ def safe_find_elements(driver, wait, FULL_URL):
         time.sleep(1)
         driver.refresh()
 
+driver = None
+
 def start_reservation(name, phone, date):
+    global driver
     try:
         print(f"예약자 이름: {name}")
         print(f"전화번호: {phone}")
         print(f"예약 날짜: {date}")
         FULL_URL = f"{BASE_URL}?date={date}&id={THEME_ID}"
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        driver = uc.Chrome(headless=True)
+        stealth(driver,
+            languages=["ko-KR", "ko"],
+            vendor="Google Inc.",
+            platform="Win32",
+            webgl_vendor="Intel Inc.",
+            renderer="Intel Iris OpenGL Engine",
+            fix_hairline=True,
+        )
         driver.get(FULL_URL)
         wait = WebDriverWait(driver, 30)
         available_time_buttons = safe_find_elements(driver, wait, FULL_URL)
@@ -163,7 +176,8 @@ def start_reservation(name, phone, date):
     except Exception as e:
         print(f"오류 발생: {e}")
         try:
-            driver.quit()
+            if driver:
+                driver.quit()
         except:
             pass
 
@@ -203,13 +217,22 @@ def on_start():
 
 def on_close():
     if messagebox.askokcancel("종료", "프로그램을 종료하시겠습니까?"):
+        try:
+            if driver:
+                driver.quit()
+        except:
+            pass
         root.destroy()
         sys.exit(0)
 
 root = tk.Tk()
 root.title("채재선정 전율미궁 프리퀄 자동 예매")
 root.iconbitmap(resource_path("my_icon.ico"))
-root.geometry("500x400")
+root.geometry("400x400")
+root.update_idletasks()
+x = (root.winfo_screenwidth() // 2) - (500 // 2)
+y = (root.winfo_screenheight() // 2) - (400 // 2)
+root.geometry(f"400x400+{x}+{y}")
 
 frame = tk.Frame(root)
 frame.pack(pady=10)
