@@ -1,3 +1,8 @@
+import tkinter as tk
+from tkinter import messagebox
+from tkinter.scrolledtext import ScrolledText
+import threading
+import sys
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -6,9 +11,11 @@ import time
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoAlertPresentException
+from selenium.webdriver.support.ui import Select
+import tkinter.font as tkfont
 
 BASE_URL = "https://www.oasismuseum.com/ticket"
-TARGET_DATE = "2025-07-19"
+TARGET_DATE = "2025-07-18"
 THEME_ID = "6"
 FULL_URL = f"{BASE_URL}?date={TARGET_DATE}&id={THEME_ID}"
 priority_times = [
@@ -22,11 +29,25 @@ priority_times = [
     "10:00"
 ]
 
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
-driver.get(FULL_URL)
-wait = WebDriverWait(driver, 30)
+class PrintLogger:
+    def __init__(self, text_widget):
+        self.text_widget = text_widget
+        self.text_widget.tag_configure("reserve_number", font=(FONT[0], 24, "bold"), foreground="blue")
 
-def safe_find_elements():
+    def write(self, message):
+        self.text_widget.insert(tk.END, message)
+        self.text_widget.see(tk.END)
+        self.text_widget.update_idletasks()
+
+    def flush(self):
+        pass
+
+    def print_reserve_number(self, reserve_number):
+        self.text_widget.insert(tk.END, f"예약번호: {reserve_number}\n", "reserve_number")
+        self.text_widget.see(tk.END)
+        self.text_widget.update_idletasks()
+
+def safe_find_elements(driver, wait, FULL_URL):
     while True:
         print("페이지 로딩 완료 대기 중...")
         try:
@@ -67,44 +88,117 @@ def safe_find_elements():
         time.sleep(1)
         driver.refresh()
 
-available_time_buttons = safe_find_elements()
+def start_reservation(name, phone, log_callback=None):
+    try:
+        print(f"예약자 이름: {name}")
+        print(f"전화번호: {phone}")
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        driver.get(FULL_URL)
+        wait = WebDriverWait(driver, 30)
+        available_time_buttons = safe_find_elements(driver, wait, FULL_URL)
 
-print("예약 가능한 시간:")
-for btn in available_time_buttons:
-    print(btn.text.strip())
+        print("예약 가능한 시간:")
+        for btn in available_time_buttons:
+            print(btn.text.strip())
+        reserved = False
+        for target_time in priority_times:
+            for btn in available_time_buttons:
+                if target_time in btn.text:
+                    btn.click()
+                    print(f"{target_time} 클릭 완료")
+                    reserved = True
+                    break
+            if reserved:
+                break
+        
+        name_input = wait.until(EC.presence_of_element_located((By.ID, "f_name")))
+        name_input.clear()
+        name_input.send_keys(name)
+        
+        phone_input = wait.until(EC.presence_of_element_located((By.ID, "f_tel")))
+        phone_input.clear()
+        phone_input.send_keys(phone)
+        
+        agree_checkbox = wait.until(EC.presence_of_element_located((By.ID, "f_agree")))
+        if not agree_checkbox.is_selected():
+            agree_checkbox.click()
+        
+        submit_btn = wait.until(EC.element_to_be_clickable((By.ID, "f_submit")))
+        submit_btn.click()
+        
+        payment_select = wait.until(EC.presence_of_element_located((By.ID, "f_payment")))
+        
+        select = Select(payment_select)
+        select.select_by_value("0")
+        print("결제수단(현금) 선택 완료")
+        final_submit_btn = wait.until(EC.element_to_be_clickable((By.ID, "f_submit")))
+        final_submit_btn.click()
+        try:
+            wait.until(EC.presence_of_element_located((By.XPATH, "//div[contains(text(), '예약번호')]")))
+            col4_divs = driver.find_elements(By.CSS_SELECTOR, "div.col-4.m-auto.text-center")
+            reserve_number = None
+            for div in col4_divs:
+                if "예약번호" in div.text:
+                    reserve_number_div = div.find_element(By.XPATH, "following-sibling::div[@class='col-8']")
+                    reserve_number = reserve_number_div.text.strip()
+                    break
+            if reserve_number:
+                sys.stdout.print_reserve_number(reserve_number)
+            else:
+                print("예약번호를 찾을 수 없습니다.")
+        except Exception as e:
+            print(f"예약번호 추출 실패: {e}")
+        print("자동 예매 완료!")
+        driver.quit()
+    except Exception as e:
+        print(f"오류 발생: {e}")
+        try:
+            driver.quit()
+        except:
+            pass
 
-for target_time in priority_times:
-    for btn in available_time_buttons:
-        if target_time in btn.text:
-            btn.click()
-            print(f"{target_time} 클릭 완료")
-            break
-    else:
-        continue
-    break
+def on_start():
+    name = entry_name.get()
+    phone = entry_phone.get()
+    if not name or not phone:
+        messagebox.showwarning("입력 오류", "이름과 전화번호를 모두 입력하세요.")
+        return
+    if not (phone.isdigit() and phone.startswith("010") and 10 <= len(phone) <= 11):
+        messagebox.showwarning("입력 오류", "전화번호는 010으로 시작하고, 숫자만 입력하며, 10~11자리여야 합니다.")
+        return
+    btn_start.config(state=tk.DISABLED)
+    threading.Thread(target=lambda: [start_reservation(name, phone), btn_start.config(state=tk.NORMAL)], daemon=True).start()
 
-name_input = wait.until(EC.presence_of_element_located((By.ID, "f_name")))
-name_input.clear()
-name_input.send_keys("홍길동")
+def on_close():
+    if messagebox.askokcancel("종료", "프로그램을 종료하시겠습니까?"):
+        root.destroy()
+        sys.exit(0)
 
-phone_input = wait.until(EC.presence_of_element_located((By.ID, "f_tel")))
-phone_input.clear()
-phone_input.send_keys("01000000000")
+root = tk.Tk()
+root.title("오아시스 뮤지엄 자동 예매")
+root.geometry("500x400")
 
-agree_checkbox = wait.until(EC.presence_of_element_located((By.ID, "f_agree")))
-if not agree_checkbox.is_selected():
-    agree_checkbox.click()
+frame = tk.Frame(root)
+frame.pack(pady=10)
 
-submit_btn = wait.until(EC.element_to_be_clickable((By.ID, "f_submit")))
-submit_btn.click()
+FONT = (tkfont.nametofont("TkDefaultFont").actual()["family"], 12)
+tk.Label(frame, text="이름:", font=FONT).grid(row=0, column=0, sticky="e")
+entry_name = tk.Entry(frame, font=FONT)
+entry_name.grid(row=0, column=1, padx=5)
 
-payment_select = wait.until(EC.presence_of_element_located((By.ID, "f_payment")))
-from selenium.webdriver.support.ui import Select
-select = Select(payment_select)
-select.select_by_value("0")
+tk.Label(frame, text="전화번호:", font=FONT).grid(row=1, column=0, sticky="e")
+entry_phone = tk.Entry(frame, font=FONT)
+entry_phone.grid(row=1, column=1, padx=5)
 
-# final_submit_btn = wait.until(EC.element_to_be_clickable((By.ID, "f_submit")))
-# final_submit_btn.click()
+btn_start = tk.Button(root, text="예매 시작", command=on_start, font=FONT)
+btn_start.pack(pady=5)
 
-input("Press enter to quit.")
-driver.quit()
+log_text = ScrolledText(root, height=15, font=FONT)
+log_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+root.protocol("WM_DELETE_WINDOW", on_close)
+
+sys.stdout = PrintLogger(log_text)
+sys.stderr = PrintLogger(log_text)
+
+root.mainloop()
