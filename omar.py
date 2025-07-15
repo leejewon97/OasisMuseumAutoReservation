@@ -163,9 +163,30 @@ def start_reservation(name, phone, log_callback=None):
         except:
             pass
 
+NAME_HINT = "박선아"
+PHONE_HINT = "01012340422"
+
+def set_placeholder(entry, hint):
+    entry.insert(0, hint)
+    entry.config(fg="gray")
+
+def clear_placeholder(event, entry, hint):
+    if entry.get() == hint:
+        entry.delete(0, tk.END)
+        entry.config(fg="black")
+
+def restore_placeholder(event, entry, hint):
+    if not entry.get():
+        entry.insert(0, hint)
+        entry.config(fg="gray")
+
 def on_start():
     name = entry_name.get()
     phone = entry_phone.get()
+    if name == NAME_HINT:
+        name = ""
+    if phone == PHONE_HINT:
+        phone = ""
     if not name or not phone:
         messagebox.showwarning("입력 오류", "이름과 전화번호를 모두 입력하세요.")
         return
@@ -192,10 +213,16 @@ FONT = (tkfont.nametofont("TkDefaultFont").actual()["family"], 12)
 tk.Label(frame, text="이름:", font=FONT).grid(row=0, column=0, sticky="e")
 entry_name = tk.Entry(frame, font=FONT)
 entry_name.grid(row=0, column=1, padx=5)
+set_placeholder(entry_name, NAME_HINT)
+entry_name.bind("<FocusIn>", lambda e: clear_placeholder(e, entry_name, NAME_HINT))
+entry_name.bind("<FocusOut>", lambda e: restore_placeholder(e, entry_name, NAME_HINT))
 
 tk.Label(frame, text="전화번호:", font=FONT).grid(row=1, column=0, sticky="e")
 entry_phone = tk.Entry(frame, font=FONT)
 entry_phone.grid(row=1, column=1, padx=5)
+set_placeholder(entry_phone, PHONE_HINT)
+entry_phone.bind("<FocusIn>", lambda e: clear_placeholder(e, entry_phone, PHONE_HINT))
+entry_phone.bind("<FocusOut>", lambda e: restore_placeholder(e, entry_phone, PHONE_HINT))
 
 btn_start = tk.Button(root, text="예매 시작", command=on_start, font=FONT)
 btn_start.pack(pady=5)
