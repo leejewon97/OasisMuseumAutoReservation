@@ -5,12 +5,22 @@ from webdriver_manager.chrome import ChromeDriverManager
 import time
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, UnexpectedAlertPresentException
+from selenium.common.exceptions import TimeoutException, NoAlertPresentException
 
 BASE_URL = "https://www.oasismuseum.com/ticket"
 TARGET_DATE = "2025-07-19"
 THEME_ID = "6"
 FULL_URL = f"{BASE_URL}?date={TARGET_DATE}&id={THEME_ID}"
+priority_times = [
+    "15:00",
+    "13:20",
+    "16:40",
+    "18:20",
+    "20:00",
+    "21:40",
+    "11:40",
+    "10:00"
+]
 
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
 driver.get(FULL_URL)
@@ -24,7 +34,7 @@ def safe_find_elements():
                 try:
                     alert = driver.switch_to.alert
                     return True
-                except:
+                except NoAlertPresentException:
                     pass
                 if len(driver.find_elements(By.CSS_SELECTOR, "button.btn-opened, button.btn-closed")) > 0:
                     return True
@@ -41,7 +51,7 @@ def safe_find_elements():
                 time.sleep(1)
                 driver.get(FULL_URL)
                 continue
-            except:
+            except NoAlertPresentException:
                 pass
         except TimeoutException:
             print("30초 대기 후에도 페이지가 로드되지 않음. 새로고침...")
@@ -63,11 +73,15 @@ print("예약 가능한 시간:")
 for btn in available_time_buttons:
     print(btn.text.strip())
 
-for btn in available_time_buttons:
-    if "10:00" in btn.text:
-        btn.click()
-        print("10:00 클릭 완료")
-        break
+for target_time in priority_times:
+    for btn in available_time_buttons:
+        if target_time in btn.text:
+            btn.click()
+            print(f"{target_time} 클릭 완료")
+            break
+    else:
+        continue
+    break
 
 name_input = wait.until(EC.presence_of_element_located((By.ID, "f_name")))
 name_input.clear()
