@@ -3,6 +3,7 @@ from tkinter import messagebox
 from tkinter.scrolledtext import ScrolledText
 import threading
 import sys
+import os
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -46,6 +47,11 @@ class PrintLogger:
         self.text_widget.insert(tk.END, f"예약번호: {reserve_number}\n", "reserve_number")
         self.text_widget.see(tk.END)
         self.text_widget.update_idletasks()
+
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 def safe_find_elements(driver, wait, FULL_URL):
     while True:
@@ -175,7 +181,8 @@ def on_close():
         sys.exit(0)
 
 root = tk.Tk()
-root.title("오아시스 뮤지엄 자동 예매")
+root.title("채재선정 전율미궁 프리퀄 자동 예매")
+root.iconbitmap(resource_path("my_icon.ico"))
 root.geometry("500x400")
 
 frame = tk.Frame(root)
