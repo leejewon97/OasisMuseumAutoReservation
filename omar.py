@@ -140,18 +140,21 @@ def start_reservation(name, phone, log_callback=None):
         final_submit_btn = wait.until(EC.element_to_be_clickable((By.ID, "f_submit")))
         final_submit_btn.click()
         try:
-            wait.until(EC.presence_of_element_located((By.XPATH, "//div[contains(text(), '예약번호')]")))
-            col4_divs = driver.find_elements(By.CSS_SELECTOR, "div.col-4.m-auto.text-center")
-            reserve_number = None
-            for div in col4_divs:
-                if "예약번호" in div.text:
-                    reserve_number_div = div.find_element(By.XPATH, "following-sibling::div[@class='col-8']")
-                    reserve_number = reserve_number_div.text.strip()
-                    break
+            reserve_number_div = wait.until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//div[contains(text(), '예약번호')]/following-sibling::*[1][@class='col-8']")
+                )
+            )
+            reserve_number = reserve_number_div.get_attribute('innerHTML').strip()
             if reserve_number:
                 sys.stdout.print_reserve_number(reserve_number)
             else:
                 print("예약번호를 찾을 수 없습니다.")
+                try:
+                    print("예약 완료 페이지 HTML 일부:")
+                    print(driver.page_source[:20000])
+                except Exception as e2:
+                    print(f"HTML 출력 중 오류: {e2}")
         except Exception as e:
             print(f"예약번호 추출 실패: {e}")
         print("자동 예매 완료!")
