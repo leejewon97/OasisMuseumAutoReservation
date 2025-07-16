@@ -225,9 +225,9 @@ def on_start():
     name = entry_name.get()
     phone = entry_phone.get()
     date = entry_date.get()
-    if name == NAME_HINT:
+    if entry_name.cget("fg") == "gray":
         name = ""
-    if phone == PHONE_HINT:
+    if entry_phone.cget("fg") == "gray":
         phone = ""
     if not name or not phone:
         messagebox.showwarning("입력 오류", "이름과 전화번호를 모두 입력하세요.")
