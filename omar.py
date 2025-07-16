@@ -54,43 +54,56 @@ def resource_path(relative_path):
         return os.path.join(sys._MEIPASS, relative_path)
     return os.path.join(os.path.abspath("."), relative_path)
 
+def wait_for_alert_or_elements(driver, by, value, multiple=False):
+    try:
+        alert = driver.switch_to.alert
+        return ("alert", alert)
+    except:
+        pass
+    if by and value:
+        try:
+            if multiple:
+                elems = driver.find_elements(by, value)
+                if elems:
+                    return ("elements", elems)
+            else:
+                elem = driver.find_element(by, value)
+                return ("element", elem)
+        except:
+            pass
+    return False
+
+def handle_wait_result(result, alert_handler):
+    if result[0] == "alert":
+        alert = result[1]
+        alert_text = alert.text
+        return alert_handler(alert, alert_text)
+    else:
+        return result[1]
+
 def safe_find_elements(driver, wait, FULL_URL):
     while True:
         print("페이지 로딩 완료 대기 중...")
+        def unavailable_date_alert_handler(alert, alert_text):
+            print(f"알림창 발견: {alert_text}")
+            alert.accept()
+            print("예약 불가능한 날짜입니다. 1초 후 다시 접속...")
+            time.sleep(1)
+            driver.get(FULL_URL)
+            return None
         try:
-            def check_page_loaded(driver):
-                try:
-                    alert = driver.switch_to.alert
-                    return True
-                except NoAlertPresentException:
-                    pass
-                if len(driver.find_elements(By.CSS_SELECTOR, "button.btn-opened, button.btn-closed")) > 0:
-                    return True
-                return False
-            
-            wait.until(check_page_loaded)
-            
-            try:
-                alert = driver.switch_to.alert
-                alert_text = alert.text
-                print(f"알림창 발견: {alert_text}")
-                alert.accept()
-                print("예약 불가능한 날짜입니다. 1초 후 다시 접속...")
-                time.sleep(1)
-                driver.get(FULL_URL)
+            result = wait.until(lambda d: wait_for_alert_or_elements(d, By.CSS_SELECTOR, "button.btn-opened, button.btn-closed", multiple=True))
+            buttons = handle_wait_result(result, unavailable_date_alert_handler)
+            if buttons is None:
                 continue
-            except NoAlertPresentException:
-                pass
         except TimeoutException:
             print("30초 대기 후에도 페이지가 로드되지 않음. 새로고침...")
             driver.refresh()
             continue
-        
-        active_btns = driver.find_elements(By.CSS_SELECTOR, "button.btn-opened")
+        active_btns = [btn for btn in buttons if 'btn-opened' in btn.get_attribute('class')]
         if active_btns:
             print(f"예약 가능한 시간 {len(active_btns)}개 발견!")
             return active_btns
-        
         print("예약 가능한 시간이 없습니다. 1초 후 새로고침...")
         time.sleep(1)
         driver.refresh()
@@ -145,32 +158,42 @@ def start_reservation(name, phone, date):
         
         submit_btn = wait.until(EC.element_to_be_clickable((By.ID, "f_submit")))
         submit_btn.click()
-        
-        payment_select = wait.until(EC.presence_of_element_located((By.ID, "f_payment")))
-        
+
+        def reserved_time_alert_handler(alert, alert_text):
+            print(f"알림창 발견: {alert_text}")
+            if "이미 예약된 테마 시간표입니다" in alert_text:
+                alert.accept()
+                print("이미 예약된 시간, 재시도합니다.")
+                driver.quit()
+                start_reservation(name, phone, date)
+            return None
+
+        result = wait.until(lambda d: wait_for_alert_or_elements(d, By.ID, "f_payment"))
+        payment_select = handle_wait_result(result, reserved_time_alert_handler)
+        if payment_select is None:
+            return
+
         select = Select(payment_select)
         select.select_by_value("0")
         print("결제수단(현금) 선택 완료")
         final_submit_btn = wait.until(EC.element_to_be_clickable((By.ID, "f_submit")))
         final_submit_btn.click()
-        try:
-            reserve_number_div = wait.until(
-                EC.presence_of_element_located(
-                    (By.XPATH, "//div[contains(text(), '예약번호')]/following-sibling::*[1][@class='col-8']")
-                )
-            )
-            reserve_number = reserve_number_div.get_attribute('innerHTML').strip()
-            if reserve_number:
-                sys.stdout.print_reserve_number(reserve_number)
-            else:
-                print("예약번호를 찾을 수 없습니다.")
-                try:
-                    print("예약 완료 페이지 HTML 일부:")
-                    print(driver.page_source[:20000])
-                except Exception as e2:
-                    print(f"HTML 출력 중 오류: {e2}")
-        except Exception as e:
-            print(f"예약번호 추출 실패: {e}")
+
+        result = wait.until(lambda d: wait_for_alert_or_elements(d, By.XPATH, "//div[contains(text(), '예약번호')]/following-sibling::*[1][@class='col-8']"))
+        reserve_number_div = handle_wait_result(result, reserved_time_alert_handler)
+        if reserve_number_div is None:
+            return
+
+        reserve_number = reserve_number_div.get_attribute('innerHTML').strip()
+        if reserve_number:
+            sys.stdout.print_reserve_number(reserve_number)
+        else:
+            print("예약번호를 찾을 수 없습니다.")
+            try:
+                print("예약 완료 페이지 HTML 일부:")
+                print(driver.page_source[:20000])
+            except Exception as e2:
+                print(f"HTML 출력 중 오류: {e2}")
         print("자동 예매 완료!")
         driver.quit()
     except Exception as e:
