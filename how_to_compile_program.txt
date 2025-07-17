@@ -1,1 +1,1 @@
-pyinstaller --onefile --noconsole -n "채재선정 전율미궁 프리퀄 자동 예매" --icon=my_icon.ico --add-data "my_icon.ico;." --add-data "Lib/site-packages/selenium_stealth/js;selenium_stealth/js" omar.py
+pyinstaller omar.spec

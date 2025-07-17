@@ -4,14 +4,11 @@ from tkinter.scrolledtext import ScrolledText
 import threading
 import sys
 import os
-from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 import time
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoAlertPresentException
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support.ui import Select
 import tkinter.font as tkfont
 from tkcalendar import DateEntry
